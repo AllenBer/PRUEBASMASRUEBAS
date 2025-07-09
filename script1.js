@@ -58,7 +58,6 @@ function startLiveCamera(docName) {
         });
 }
 
-// *** Lógica para tomar la foto y ahora procesarla automáticamente ***
 function takePhoto() {
     const video = document.getElementById("live-video");
     const canvas = document.createElement("canvas");
@@ -73,8 +72,9 @@ function takePhoto() {
     // Verifica si OpenCV está cargado
     if (!cv) {
         alert("OpenCV.js no está cargado. No se puede realizar el recorte automático.");
-        // Si OpenCV no está listo, puedes guardar la imagen sin procesar o pedir reintentar
-        const imageDataURL = canvas.toDataURL("image/jpeg", 0.7);
+        // Si OpenCV no está listo, guarda la imagen con calidad ajustada
+        // Calidad alta para "Contrato laboral", estándar para los demás
+        const imageDataURL = canvas.toDataURL("image/jpeg", currentLiveDoc === "Contrato laboral" ? 1.0 : 0.7);
         scannedImages[currentLiveDoc] = imageDataURL;
         document.getElementById(`preview-${currentLiveDoc}`).src = imageDataURL;
         document.getElementById(`preview-${currentLiveDoc}`).style.display = 'block';
@@ -95,7 +95,6 @@ function closeLiveCamera() {
     }
 }
 
-// *** NUEVA FUNCIÓN PARA PROCESAR LA IMAGEN CON OPENCV ***
 function processImageWithOpenCV(canvasElement, docName) {
     console.log("Iniciando procesamiento con OpenCV.js...");
 
@@ -134,7 +133,7 @@ function processImageWithOpenCV(canvasElement, docName) {
             let approx = new cv.Mat();
             cv.approxPolyDP(contour, approx, 0.02 * perimeter, true);
 
-            // Si el contorno tiene 4 puntos y es suficientemente grande (podrías añadir más lógica aquí)
+            // Si el contorno tiene 4 puntos
             if (approx.rows === 4) {
                 if (area > maxArea) {
                     maxArea = area;
@@ -146,8 +145,6 @@ function processImageWithOpenCV(canvasElement, docName) {
 
         if (bestContour) {
             // 6. Preparar los puntos de origen para la transformación de perspectiva
-            // Los puntos deben estar en un orden consistente (ej. superior-izquierdo, superior-derecho, inferior-derecho, inferior-izquierdo)
-            // Esto es crucial para la corrección de perspectiva. Necesitas ordenarlos.
             let points = [];
             for (let i = 0; i < bestContour.rows; ++i) {
                 points.push({ x: bestContour.data32S[i * 2], y: bestContour.data32S[i * 2 + 1] });
@@ -156,7 +153,6 @@ function processImageWithOpenCV(canvasElement, docName) {
             // Función auxiliar para ordenar los 4 puntos (superior-izq, superior-der, inferio-der, inferior-izq)
             function orderPoints(pts) {
                 let rect = new Array(4);
-                // Suma y diferencia de coordenadas para encontrar las esquinas
                 let s = pts.map(p => p.x + p.y);
                 let diff = pts.map(p => p.y - p.x);
 
@@ -169,7 +165,6 @@ function processImageWithOpenCV(canvasElement, docName) {
             }
 
             let orderedPts = orderPoints(points);
-
             let [tl, tr, br, bl] = orderedPts;
 
             // Calcular el ancho y alto del nuevo documento "aplanado"
@@ -206,11 +201,24 @@ function processImageWithOpenCV(canvasElement, docName) {
             M.delete();
             bestContour.delete();
 
-            // 8. Mostrar el resultado
+            // 8. Opcional: Aplicar binarización si es el Contrato laboral para mejorar legibilidad de texto pequeño
             const finalCanvas = document.createElement('canvas');
-            cv.imshow(finalCanvas, dst); // Dibuja la Mat de OpenCV en un nuevo canvas
+            if (docName === "Contrato laboral") {
+                let tempGrayForBinarization = new cv.Mat();
+                let binarizedMat = new cv.Mat();
+                // Convertir 'dst' a escala de grises si no lo está ya, para la binarización
+                cv.cvtColor(dst, tempGrayForBinarization, cv.COLOR_RGBA2GRAY, 0);
+                // Aplicar Otsu's thresholding (binarización automática)
+                cv.threshold(tempGrayForBinarization, binarizedMat, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU);
+                cv.imshow(finalCanvas, binarizedMat); // Dibuja la Mat binarizada
+                tempGrayForBinarization.delete();
+                binarizedMat.delete();
+            } else {
+                cv.imshow(finalCanvas, dst); // Para otros documentos, solo muestra la imagen recortada
+            }
 
-            const processedDataURL = finalCanvas.toDataURL("image/jpeg", 0.9); // Calidad ajustable
+            // Calidad JPEG: 1.0 para Contrato laboral, 0.7 para los demás
+            const processedDataURL = finalCanvas.toDataURL("image/jpeg", docName === "Contrato laboral" ? 1.0 : 0.7);
 
             scannedImages[docName] = processedDataURL;
             document.getElementById(`preview-${docName}`).src = processedDataURL;
@@ -219,7 +227,8 @@ function processImageWithOpenCV(canvasElement, docName) {
         } else {
             console.warn("No se pudo detectar un documento rectangular. Se guardará la imagen sin procesar.");
             alert("No se detectó un documento claro. Se guardará la imagen completa. Puedes usar la opción 'Recortar (manual)' si es necesario.");
-            const originalDataURL = canvasElement.toDataURL("image/jpeg", 0.7);
+            // Calidad de la imagen original si no se puede procesar automáticamente
+            const originalDataURL = canvasElement.toDataURL("image/jpeg", currentLiveDoc === "Contrato laboral" ? 1.0 : 0.7);
             scannedImages[docName] = originalDataURL;
             document.getElementById(`preview-${docName}`).src = originalDataURL;
             document.getElementById(`preview-${docName}`).style.display = 'block';
@@ -230,7 +239,7 @@ function processImageWithOpenCV(canvasElement, docName) {
         console.error("Error durante el procesamiento OpenCV:", err);
         alert("Ocurrió un error al procesar la imagen automáticamente.");
         // En caso de error, guarda la imagen original para que el usuario pueda intentar el recorte manual
-        const originalDataURL = canvasElement.toDataURL("image/jpeg", 0.7);
+        const originalDataURL = canvasElement.toDataURL("image/jpeg", currentLiveDoc === "Contrato laboral" ? 1.0 : 0.7);
         scannedImages[docName] = originalDataURL;
         document.getElementById(`preview-${docName}`).src = originalDataURL;
         document.getElementById(`preview-${docName}`).style.display = 'block';
@@ -247,8 +256,6 @@ function processImageWithOpenCV(canvasElement, docName) {
     }
 }
 
-// *** Las funciones de Cropper.js (recorte manual) se mantienen igual por ahora ***
-// openCrop: Se mantiene para ofrecer la opción de recorte manual.
 function openCrop(docName) {
     const imageSrc = scannedImages[docName];
     if (!imageSrc) {
@@ -302,7 +309,8 @@ function confirmCrop() {
         return;
     }
 
-    const croppedDataUrl = canvas.toDataURL("image/jpeg", 0.9); // Ajustar calidad
+    // Calidad JPEG al confirmar recorte manual: 1.0 para Contrato laboral, 0.7 para los demás
+    const croppedDataUrl = canvas.toDataURL("image/jpeg", currentDocForCrop === "Contrato laboral" ? 1.0 : 0.7);
     scannedImages[currentDocForCrop] = croppedDataUrl;
     document.getElementById(`preview-${currentDocForCrop}`).src = croppedDataUrl;
     document.getElementById(`status-${currentDocForCrop}`).textContent = '🟩';
@@ -317,7 +325,6 @@ function closeCrop() {
     document.getElementById("cropper-modal").style.display = "none";
 }
 
-// Funciones de generación de ZIP y PDF (se mantienen sin cambios)
 async function generateZip() {
     const zip = new JSZip();
 
@@ -329,9 +336,13 @@ async function generateZip() {
     const blob = await zip.generateAsync({ type: 'blob' });
     const sizeMB = blob.size / (1024 * 1024);
 
-    if (sizeMB < 0.5) { // Ajusta este umbral a un valor más realista para pruebas, luego a 4
-        alert(`El ZIP pesa solo ${sizeMB.toFixed(2)}MB. Asegúrate de que las imágenes tengan buena calidad y se hayan escaneado.`);
-        return;
+    // Si el ZIP excede los 4MB, se muestra una advertencia
+    if (sizeMB > 4) {
+        alert(`Advertencia: El tamaño del ZIP es ${sizeMB.toFixed(2)} MB, lo cual excede los 4 MB recomendados. Esto podría deberse a la alta resolución de las imágenes.`);
+        // Puedes optar por no descargar si excede el límite si lo prefieres:
+        // return;
+    } else {
+         alert(`El ZIP pesa ${sizeMB.toFixed(2)} MB.`);
     }
 
     const url = URL.createObjectURL(blob);
