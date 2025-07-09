@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Escáner de Documentos</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <h1>📄 Escaneo de Documentos</h1>
+    <div id="document-container">
+        </div>
+
+    <div class="button-group">
+        <button onclick="generateZip()">📦 Generar ZIP</button>
+        <button onclick="generatePDFs()">🖨 Descargar en PDF</button>
+    </div>
+
+    <div id="live-camera-modal">
+        <video id="live-video" autoplay playsinline></video>
+        <button onclick="takePhoto()">📸 Tomar foto</button>
+        <button onclick="closeLiveCamera()">❌ Cancelar</button>
+    </div>
+
+    <div id="cropper-modal">
+        <div id="cropper-container">
+            <img id="cropper-image" />
+            <button onclick="confirmCrop()">✅ Confirmar recorte</button>
+            <button onclick="closeCrop()">❌ Cancelar</button>
+        </div>
+    </div>
+
+    <script async src="https://docs.opencv.org/4.x/opencv.js" onload="onOpenCvReady();"></script>
+    <script src="https://cdn.jsdelivr.net/npm/cropperjs"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jszip"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script src="script1.js"></script>
+</body>
+</html>
