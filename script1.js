@@ -368,3 +368,19 @@ function generatePDFs() {
         pdf.save(`${index + 1}_${docName}.pdf`);
     });
 }
+
+cropperImg.onload = null;
+cropperImg.src = "";
+setTimeout(() => {
+    cropperImg.src = imageSrc;
+    cropperImg.onload = () => {
+        cropper = new Cropper(cropperImg, {
+            viewMode: 1,
+            autoCropArea: 0.8,
+            responsive: true,
+            background: false,
+            movable: true,
+            zoomable: true
+        });
+    };
+}, 50);
